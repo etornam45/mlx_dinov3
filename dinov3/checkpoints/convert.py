@@ -13,9 +13,9 @@ from PIL import Image
 from dinov3.models import vit_small
 from transformers import AutoModel, AutoProcessor
 
-CHECKPOINT_PATH = "/Users/macbookprom1/Documents/AI/dinov3/dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
+CHECKPOINT_PATH = "dinov3/checkpoints/model/dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
 IMAGE_PATH = "image.jpg"
-MLX_WEIGHTS_PATH = "dinov3/checkpoints/vit-small.safetensors"
+MLX_WEIGHTS_PATH = "dinov3/checkpoints/model/vit-small.safetensors"
 HF_MODEL_NAME = "facebook/dinov3-vits16-pretrain-lvd1689m"
 
 def torch_to_mlx(v: torch.Tensor, key: str = "") -> mx.array:
