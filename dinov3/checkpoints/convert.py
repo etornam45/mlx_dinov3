@@ -7,7 +7,6 @@ and update CHECKPOINT_PATH below if needed.
 
 from dinov3.models import DinoVisionTransformer
 import mlx.core as mx
-import mlx.nn as nn
 import torch
 from PIL import Image
 from dinov3.models import vit_small
