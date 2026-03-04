@@ -54,27 +54,28 @@ class PatchEmbed(nn.Module):
 
         self.flatten_embedding = flatten_embedding
 
-        # We store weights in NCHW (O, I, H, W) to match the original DINOv3 code
-        # and simplify weight loading.
-        self.proj = nn.Module()
-        self.proj.weight = mx.zeros((embed_dim, in_chans, patch_HW[0], patch_HW[1]))
-        self.proj.bias = mx.zeros((embed_dim,))
+        # MLX Conv2d expects inputs in NHWC and weights in OHWI.
+        self.proj = nn.Conv2d(
+            in_chans,
+            embed_dim,
+            kernel_size=patch_HW,
+            stride=patch_HW,
+            bias=True,
+        )
         self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
 
     def __call__(self, x: mx.array) -> mx.array:
-        # Input is NCHW (B, C, H, W)
-        B, C, H, W = x.shape
+        # Input is expected to be NHWC (B, H, W, C)
+        # However, for compatibility with typical PT style calling code,
+        # we check if it looks like NCHW and transpose if needed.
+        # But per standard MLX, we should prefer NHWC.
+        if x.ndim == 4 and x.shape[1] == self.in_chans and x.shape[-1] != self.in_chans:
+            x = x.transpose(0, 2, 3, 1)
 
-        # MLX Conv2d expects NHWC x and OHWI weight.
-        # x: (B, C, H, W) -> (B, H, W, C)
-        x = x.transpose(0, 2, 3, 1)
-        # w: (O, I, H, W) -> (O, H, W, I)
-        w = self.proj.weight.transpose(0, 2, 3, 1)
+        B, H, W, C = x.shape
 
         # Convolution in NHWC
-        x = (
-            mx.conv2d(x, w, self.patch_size) + self.proj.bias
-        )  # (B, H_out, W_out, embed_dim)
+        x = self.proj(x)  # (B, H_out, W_out, embed_dim)
         B, H_out, W_out, C_out = x.shape
 
         # Flatten to (B, N, D) where N = H_out * W_out
@@ -101,21 +102,22 @@ class PatchEmbed(nn.Module):
         return flops
 
     def reset_parameters(self):
-        # Reinitialize weights in NCHW (O, I, H, W)
-        k = 1 / (self.in_chans * (self.patch_size[0] ** 2))
-        limit = math.sqrt(k)
+        # Reinitialize weights using Conv2d's initialization logic or custom
+        fan_in = self.in_chans * self.patch_size[0] * self.patch_size[1]
+        std = 1.0 / math.sqrt(fan_in)
         self.proj.weight = mx.random.uniform(
-            low=-limit,
-            high=limit,
+            low=-std,
+            high=std,
             shape=self.proj.weight.shape,
             dtype=self.proj.weight.dtype,
         )
-        self.proj.bias = mx.random.uniform(
-            low=-limit,
-            high=limit,
-            shape=self.proj.bias.shape,
-            dtype=self.proj.bias.dtype,
-        )
+        if "bias" in self.proj:
+            self.proj.bias = mx.random.uniform(
+                low=-std,
+                high=std,
+                shape=self.proj.bias.shape,
+                dtype=self.proj.bias.dtype,
+            )
 
 
 if __name__ == "__main__":
