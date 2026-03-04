@@ -27,7 +27,7 @@ ffn_layer_dict = {
 }
 
 norm_layer_dict = {
-    "layernorm": partial(nn.LayerNorm, eps=1e-6),
+    "layernorm": partial(nn.LayerNorm, eps=1e-5),
     "layernormbf16": partial(nn.LayerNorm, eps=1e-5),
     "rmsnorm": RMSNorm,
 }
@@ -38,6 +38,7 @@ dtype_dict: Dict[str, mx.Dtype] = {
     "fp16": mx.float16,
     "bf16": mx.bfloat16,
 }
+
 
 def init_weights_vit(module: nn.Module, name: str = ""):
     """
@@ -112,7 +113,9 @@ class DinoVisionTransformer(nn.Module):
 
         norm_layer_cls = norm_layer_dict[norm_layer]
 
-        self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
+        self.num_features = self.embed_dim = (
+            embed_dim  # num_features for consistency with other models
+        )
         self.n_blocks = depth
         self.num_heads = num_heads
         self.patch_size = patch_size
@@ -135,9 +138,13 @@ class DinoVisionTransformer(nn.Module):
         logger.info(f"using base={pos_embed_rope_base} for rope new")
         logger.info(f"using min_period={pos_embed_rope_min_period} for rope new")
         logger.info(f"using max_period={pos_embed_rope_max_period} for rope new")
-        logger.info(f"using normalize_coords={pos_embed_rope_normalize_coords} for rope new")
+        logger.info(
+            f"using normalize_coords={pos_embed_rope_normalize_coords} for rope new"
+        )
         logger.info(f"using shift_coords={pos_embed_rope_shift_coords} for rope new")
-        logger.info(f"using rescale_coords={pos_embed_rope_rescale_coords} for rope new")
+        logger.info(
+            f"using rescale_coords={pos_embed_rope_rescale_coords} for rope new"
+        )
         logger.info(f"using jitter_coords={pos_embed_rope_jitter_coords} for rope new")
         logger.info(f"using dtype={pos_embed_rope_dtype} for rope new")
         self.rope_embed = RopePositionEmbedding(
@@ -287,12 +294,8 @@ class DinoVisionTransformer(nn.Module):
                         x_val[:, : self.n_storage_tokens + 1]
                     )
                 else:
-                    x_norm_cls_reg = self.norm(
-                        x_val[:, : self.n_storage_tokens + 1]
-                    )
-                x_norm_patch = self.norm(
-                    x_val[:, self.n_storage_tokens + 1 :]
-                )
+                    x_norm_cls_reg = self.norm(x_val[:, : self.n_storage_tokens + 1])
+                x_norm_patch = self.norm(x_val[:, self.n_storage_tokens + 1 :])
             else:
                 x_norm = self.norm(x_val)
                 x_norm_cls_reg = x_norm[:, : self.n_storage_tokens + 1]
@@ -309,11 +312,15 @@ class DinoVisionTransformer(nn.Module):
         return output
 
     def forward_features(
-        self, x: mx.array | List[mx.array], masks: Optional[mx.array] = None
+        self,
+        x: mx.array | List[mx.array],
+        masks: Optional[mx.array | List[Optional[mx.array]]] = None,
     ) -> Union[Dict[str, mx.array], List[Dict[str, mx.array]]]:
         if isinstance(x, mx.array):
             return self.forward_features_list([x], [masks])[0]
         else:
+            if masks is None:
+                masks = [None] * len(x)
             return self.forward_features_list(x, masks)
 
     def _get_intermediate_layers_not_chunked(
@@ -322,7 +329,9 @@ class DinoVisionTransformer(nn.Module):
         x, (H, W) = self.prepare_tokens_with_masks(x)
         # If n is an int, take the n last blocks. If it's a list, take them
         output, total_block_len = [], len(self.blocks)
-        blocks_to_take = range(total_block_len - n, total_block_len) if isinstance(n, int) else n
+        blocks_to_take = (
+            range(total_block_len - n, total_block_len) if isinstance(n, int) else n
+        )
         for i, blk in enumerate(self.blocks):
             if self.rope_embed is not None:
                 rope_sincos = self.rope_embed(H=H, W=W)
@@ -331,7 +340,9 @@ class DinoVisionTransformer(nn.Module):
             x = blk(x, rope_sincos)
             if i in blocks_to_take:
                 output.append(x)
-        assert len(output) == len(blocks_to_take), f"only {len(output)} / {len(blocks_to_take)} blocks found"
+        assert len(output) == len(blocks_to_take), (
+            f"only {len(output)} / {len(blocks_to_take)} blocks found"
+        )
         return output
 
     def get_intermediate_layers(
@@ -349,12 +360,8 @@ class DinoVisionTransformer(nn.Module):
             outputs_normed = []
             for out in outputs:
                 if self.untie_cls_and_patch_norms:
-                    x_norm_cls_reg = self.cls_norm(
-                        out[:, : self.n_storage_tokens + 1]
-                    )
-                    x_norm_patch = self.norm(
-                        out[:, self.n_storage_tokens + 1 :]
-                    )
+                    x_norm_cls_reg = self.cls_norm(out[:, : self.n_storage_tokens + 1])
+                    x_norm_patch = self.norm(out[:, self.n_storage_tokens + 1 :])
                     outputs_normed.append(
                         mx.concat((x_norm_cls_reg, x_norm_patch), axis=1)
                     )
@@ -368,9 +375,7 @@ class DinoVisionTransformer(nn.Module):
             B, _, h, w = x.shape
             outputs = [
                 mx.transpose(
-                    out.reshape(
-                        B, h // self.patch_size, w // self.patch_size, -1
-                    ),
+                    out.reshape(B, h // self.patch_size, w // self.patch_size, -1),
                     (0, 3, 1, 2),
                 )
                 for out in outputs
