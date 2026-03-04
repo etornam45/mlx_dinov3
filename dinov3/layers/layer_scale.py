@@ -16,7 +16,7 @@ class LayerScale(nn.Module):
     ) -> None:
         super().__init__()
         self.inplace = inplace
-        self.gamma = mx.empty(shape=(dim,), dtype=mx.float32)	
+        self.gamma = mx.zeros(shape=(dim,), dtype=mx.float32)	
         self.init_values = init_values
 
     def reset_parameters(self):

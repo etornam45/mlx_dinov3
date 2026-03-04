@@ -1,9 +1,9 @@
 import logging
 from math import prod
-from typing import List, Tuple
+from typing import Callable, List, Tuple
 
 import mlx.core as mx
-
+import mlx.nn as nn
 
 logger = logging.getLogger("dinov3")
 
@@ -63,3 +63,22 @@ def uncat_with_shapes(
 
 		return outputs
 
+def named_apply(
+    fn: Callable,
+    module: nn.Module,
+    name: str = "",
+    depth_first: bool = True,
+    include_root: bool = False,
+) -> nn.Module:
+    """
+    MLX-friendly version of timm.named_apply.
+
+    Iterates over all submodules (and optionally the root) using
+    :meth:`mlx.nn.Module.named_modules` and applies ``fn(module=..., name=...)``.
+    """
+    # Collect all modules with their hierarchical names.
+    for mod_name, mod in module.named_modules():
+        if mod_name == "" and not include_root:
+            continue
+        fn(module=mod, name=mod_name)
+    return module

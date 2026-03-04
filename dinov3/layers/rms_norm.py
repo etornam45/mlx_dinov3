@@ -11,6 +11,9 @@ class RMSNorm(nn.Module):
     def __call__(self, x: mx.array) -> mx.array:
         return x * mx.rsqrt(mx.square(x).mean(axis=-1, keepdims=True) + self.eps) * self.weight
 
+    def reset_parameters(self):
+        self.weight = mx.ones_like(self.weight)
+
 
 if __name__ == "__main__":
 	rms_norm = RMSNorm(dim=1024)
