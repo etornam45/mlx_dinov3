@@ -97,9 +97,9 @@ class SelfAttention(nn.Module):
 			return q.astype(q_dtype), k.astype(k_dtype)
 
 
-		def __call__(self, x: mx.array, attn_bias: mx.array | None = None, rope_list: List[mx.array] | None = None) -> mx.array:
+		def __call__(self, x: mx.array, attn_bias: mx.array | None = None, rope: List[mx.array] | None = None) -> mx.array:
 			qkv = self.qkv(x)
-			attn_v = self.compute_attention(qkv=qkv, attn_bias=attn_bias, rope=rope_list)
+			attn_v = self.compute_attention(qkv=qkv, attn_bias=attn_bias, rope=rope)
 			x = self.proj(attn_v)
 			x = self.proj_drop(x)
 			return x

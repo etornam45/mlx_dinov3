@@ -13,4 +13,4 @@ outputs = model(**inputs)
 
 # print(outputs)
 
-print(model.rope_embeddings)
+print(model)
