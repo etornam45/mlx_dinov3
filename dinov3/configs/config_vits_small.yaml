@@ -1,0 +1,8 @@
+model_type: "vit_small"
+patch_size: 16
+img_size: 224
+in_chans: 3
+layerscale_init: 0.00001
+n_storage_tokens: 4
+mask_k_bias: true
+pos_embed_rope_base: 100.0
